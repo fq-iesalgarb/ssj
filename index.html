@@ -372,6 +372,32 @@
       font-size: 0.82rem;
     }
 
+    /* Botó cel nocturn */
+    .night-sky-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .night-btn {
+      width: 100%;
+      justify-content: center;
+      padding: 0.45rem 0.7rem;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-size: 0.8rem;
+    }
+
+    .night-btn.active {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border-color: #818cf8;
+      color: #e0e7ff;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+    }
+
     /* Control lliscant d'orientació lliure */
     .free-angle-box {
       background-color: var(--bg-panel);
@@ -474,7 +500,20 @@
       box-shadow: 0 0 8px rgba(255, 255, 255, 0.55), 0 2px 6px rgba(0, 0, 0, 0.75);
     }
 
-    @media (max-width: 960px) {
+    .plaque-marker {
+      background-color: #f59e0b;
+      border: 2px solid #ffffff;
+      border-radius: 4px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0f172a;
+      font-weight: 900;
+      font-size: 10px;
+    }
+
+    @media (max-width: 1020px) {
       main {
         flex-direction: column;
       }
@@ -505,11 +544,12 @@
     </div>
 
     <div class="header-actions">
-      <!-- Barra jeràrquica de capes (Sol -> Òrbites -> Planetes -> Asteroides -> Centaures -> Cometes -> Transneptunians -> Sondes) -->
+      <!-- Barra jeràrquica de capes -->
       <div class="layer-group" aria-label="Filtres de capes astronòmiques">
         <button id="btn-center-sun" title="Centrar el mapa al Sol (IES Algarb)">☀️ Sol</button>
         <button class="layer-btn active" id="btn-toggle-orbits" title="Mostrar o amagar les òrbites">🪐 Òrbites</button>
-        <button class="layer-btn active" data-layer="planets" title="Mostrar o amagar els planetes">🌍 Planetes</button>
+        <button class="layer-btn active" id="btn-layer-planets" data-layer="planets" title="Mostrar o amagar els planetes en posició real">🌍 Planetes</button>
+        <button class="layer-btn" id="btn-layer-plaques" title="Mostrar la ubicació real de les plaques físiques del projecte (desactiva Planetes)">📍 Plaques</button>
         <button class="layer-btn active" data-layer="asteroids" title="Mostrar o amagar els asteroides">🪨 Asteroides</button>
         <button class="layer-btn active" data-layer="centaurs" title="Mostrar o amagar els centaures">💠 Centaures</button>
         <button class="layer-btn active" data-layer="comets" title="Mostrar o amagar els cometes">☄️ Cometes</button>
@@ -580,6 +620,13 @@
             </select>
           </div>
 
+          <!-- Botó per mostrar el cel nocturn de la Terra (recta tangent a l'òrbita terrestre) -->
+          <div class="night-sky-row" id="night-sky-row">
+            <button type="button" class="night-btn" id="btn-night-sky" title="Mostra la recta tangent a l'òrbita de la Terra i enfosqueix el cel nocturn visible avui">
+              🌓 Mostra el cel nocturn de la Terra (avui)
+            </button>
+          </div>
+
           <!-- Control de rotació lliure -->
           <div class="free-angle-box hidden" id="free-angle-box">
             <div class="free-angle-header">
@@ -635,7 +682,7 @@
 
   <script>
     // =========================================================================
-    // 1. PARÀMETRES FÍSICS I COORDENADES DE LES ÒRBITES DEL PROJECTE (IES ALGARB)
+    // 1. PARÀMETRES FÍSICS I COORDENADES DE LES ÒRBITES I PLAQUES (IES ALGARB)
     // =========================================================================
     const SUN_COORDS = [38.898665, 1.400298]; // Ubicació exacta del Sol a l'IES Algarb
     const SUN_REAL_DIAMETER_M = 1.3927e9;     // Diàmetre real del Sol (m)
@@ -646,7 +693,6 @@
     const SPEED_OF_LIGHT_KMS = 299792.458;    // Velocitat de la llum (km/s)
     const EARTH_RADIUS_M = 6371008.8;         // Radi mitjà terrestre (WGS84 / Leaflet)
 
-    // Funcions d'involucració per a KaTeX
     function mInline(latex) {
       return window.katex ? katex.renderToString(latex, { throwOnError: false, displayMode: false }) : latex;
     }
@@ -654,7 +700,6 @@
       return window.katex ? katex.renderToString(latex, { throwOnError: false, displayMode: true }) : latex;
     }
 
-    // Coordenades exactes per on passen les òrbites publicades al Sistema Solar Jordier
     const PROJECT_ORBIT_POINTS = [
       { id: "mercuri",     name: "Mercuri",                         coords: [38.898561260609775, 1.4003661503684373], color: "#94a3b8", dashed: false },
       { id: "venus",       name: "Venus",                           coords: [38.89848089361968,  1.4004318644892415], color: "#fde047", dashed: false },
@@ -662,7 +707,7 @@
       { id: "mart",        name: "Mart",                            coords: [38.89827893201962,  1.4005941381328038], color: "#f87171", dashed: false },
       { id: "aster_in",    name: "Inici del Cinturó d'Asteroides",  coords: [38.898324832181785, 1.4009346624330776], color: "#facc15", dashed: true  },
       { id: "aster_out",   name: "Final del Cinturó d'Asteroides",  coords: [38.8984531835051,   1.4014540971394882], color: "#facc15", dashed: true  },
-      { id: "jupiter",     name: "Júpiter",                         coords: [38.900009477515994, 1.4015101140452335], color: "#fb923c", dashed: false },
+      { id: "jupiter",     name: "Júpiter",                         coords: [38.89975,           1.40163],            color: "#fb923c", dashed: false },
       { id: "saturn",      name: "Saturn",                          coords: [38.900549439558795, 1.4025248147965867], color: "#eab308", dashed: false },
       { id: "ura",         name: "Urà",                             coords: [38.89306492672504,  1.3973974851717734], color: "#2dd4bf", dashed: false },
       { id: "neptu",       name: "Neptú",                           coords: [38.89139123899286,  1.3941049975436008], color: "#60a5fa", dashed: false },
@@ -672,6 +717,23 @@
       { id: "oort_in",     name: "Inici del Núvol d'Oort",          coords: [38.84410657976851,  0.09779146477923588],color: "#f43f5e", dashed: true  },
       { id: "oort_out",    name: "Final del Núvol d'Oort",          coords: [27.428233852588377, -9.281506033196074], color: "#f43f5e", dashed: true  },
       { id: "alfacentauri",name: "Sistema Alfa Centauri",           coords: [-3.822903307804777,-73.32497036109814], color: "#34d399", dashed: true  }
+    ];
+
+    const PHYSICAL_PLAQUES = [
+      { name: "Placa: Sol",                            coords: [38.89865, 1.40029], color: "#f59e0b", desc: "Esfera solar de 30 cm al pati de l'IES Algarb." },
+      { name: "Placa: Mercuri",                        coords: [38.89855, 1.40036], color: "#94a3b8", desc: "Placa informativa de Mercuri al recinte de l'institut." },
+      { name: "Placa: Venus",                          coords: [38.89847, 1.40043], color: "#fde047", desc: "Placa informativa de Venus al recinte de l'institut." },
+      { name: "Placa: Terra",                          coords: [38.89840, 1.40049], color: "#38bdf8", desc: "Placa informativa de la Terra al recinte de l'institut." },
+      { name: "Placa: Mart",                           coords: [38.89827, 1.40060], color: "#f87171", desc: "Placa informativa de Mart al recinte de l'institut." },
+      { name: "Placa: Inici del cinturó d'asteroides", coords: [38.89837, 1.40097], color: "#facc15", desc: "Fita d'inici del Cinturó Principal d'Asteroides." },
+      { name: "Placa: Final del cinturó d'asteroides", coords: [38.89845, 1.40146], color: "#facc15", desc: "Fita de final del Cinturó Principal d'Asteroides." },
+      { name: "Placa: Júpiter",                        coords: [38.89975, 1.40163], color: "#fb923c", desc: "Placa informativa de Júpiter a Sant Jordi." },
+      { name: "Placa: Saturn",                         coords: [38.90053, 1.40254], color: "#eab308", desc: "Placa informativa de Saturn a Sant Jordi." },
+      { name: "Placa: Urà",                            coords: [38.89305, 1.39735], color: "#2dd4bf", desc: "Placa informativa d'Urà a Sant Jordi." },
+      { name: "Placa: Neptú",                          coords: [38.89159, 1.39370], color: "#60a5fa", desc: "Placa informativa de Neptú." },
+      { name: "Placa: Inici del cinturó de Kuiper",    coords: [38.88969, 1.39612], color: "#a855f7", desc: "Fita d'inici del Cinturó de Kuiper." },
+      { name: "Placa: Plutó",                          coords: [38.89470, 1.38642], color: "#c084fc", desc: "Placa informativa de Plutó." },
+      { name: "Placa: Final del cinturó de Kuiper",    coords: [38.87065, 1.38731], color: "#a855f7", desc: "Fita de final del Cinturó de Kuiper." }
     ];
 
     // =========================================================================
@@ -934,7 +996,6 @@
       return { au: r, lonDeg };
     }
 
-    // Catàleg ordenat jeràrquicament des de l'interior cap a l'exterior del Sistema Solar
     const CELESTIAL_CATALOG = [
       // --- 1. PLANETES DEL SISTEMA SOLAR ---
       {
@@ -1282,7 +1343,7 @@
     }
 
     // =========================================================================
-    // 5. CAPES JERÀRQUIQUES I RENDERITZACIÓ DE MARCADORS
+    // 5. CAPES JERÀRQUIQUES, PLAQUES FÍSIQUES I CEL NOCTURN (TANGENT TERRESTRE)
     // =========================================================================
     const OBJECT_LAYERS = {
       planets: L.layerGroup().addTo(map),
@@ -1293,6 +1354,9 @@
       probes: L.layerGroup().addTo(map)
     };
 
+    const plaquesLayer = L.layerGroup();
+    const nightSkyLayer = L.layerGroup().addTo(map);
+
     const LAYER_VISIBILITY = {
       planets: true,
       asteroids: true,
@@ -1302,18 +1366,116 @@
       probes: true
     };
 
+    let plaquesVisible = false;
+    let nightSkyVisible = false;
+
     function getCardinalText(az) {
       const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
       const idx = Math.round(((az % 360) / 22.5)) % 16;
       return dirs[idx];
     }
 
+    // Dibuixa la recta tangent a l'òrbita terrestre (en coordenades projectades per evitar
+    // deformacions o salts a l'antimeridià) i enfosqueix tot el semiplà nocturn oposat al Sol
+    function renderNightSkyOverlay(earthCoords, earthBearing) {
+      nightSkyLayer.clearLayers();
+      if (!nightSkyVisible) return;
+
+      // Projectem la posició del Sol i de la Terra en coordenades WebMercator (metres plans)
+      const pSun = L.Projection.SphericalMercator.project(L.latLng(SUN_COORDS[0], SUN_COORDS[1]));
+      const pEarth = L.Projection.SphericalMercator.project(L.latLng(earthCoords[0], earthCoords[1]));
+
+      // Vector unitari radial Sol -> Terra (direcció antisolar = centre del cel nocturn)
+      let vx = pEarth.x - pSun.x;
+      let vy = pEarth.y - pSun.y;
+      const len = Math.hypot(vx, vy);
+      if (len === 0) return;
+      vx /= len;
+      vy /= len;
+
+      // Vector tangent unitari (perpendicular al radi vector)
+      const tx = -vy;
+      const ty = vx;
+
+      // Estenem la recta tangent 12.000 km a cada banda i el semiplà nocturn 12.000 km endavant
+      // (prou ampli per cobrir tot el Sistema Solar Jordier fins a Alfa Centauri sense creuar els pols)
+      const halfSpan = 12000000;
+      const depth = 12000000;
+
+      // Generem 40 punts intermedis al llarg de la recta tangent perquè es mantingui perfectament recta a qualsevol zoom
+      const tangentLatLngs = [];
+      const steps = 40;
+      for (let s = -steps; s <= steps; s++) {
+        const d = (s / steps) * halfSpan;
+        const pt = L.point(pEarth.x + tx * d, pEarth.y + ty * d);
+        tangentLatLngs.push(L.Projection.SphericalMercator.unproject(pt));
+      }
+
+      const pLeft = L.Projection.SphericalMercator.unproject(
+        L.point(pEarth.x - tx * halfSpan, pEarth.y - ty * halfSpan)
+      );
+      const pRight = L.Projection.SphericalMercator.unproject(
+        L.point(pEarth.x + tx * halfSpan, pEarth.y + ty * halfSpan)
+      );
+      const pNightRight = L.Projection.SphericalMercator.unproject(
+        L.point(pEarth.x + tx * halfSpan + vx * depth, pEarth.y + ty * halfSpan + vy * depth)
+      );
+      const pNightLeft = L.Projection.SphericalMercator.unproject(
+        L.point(pEarth.x - tx * halfSpan + vx * depth, pEarth.y - ty * halfSpan + vy * depth)
+      );
+
+      // Polígon d'ombra per a la part nocturna del cel
+      L.polygon([pLeft, pRight, pNightRight, pNightLeft], {
+        stroke: false,
+        fillColor: "#020617",
+        fillOpacity: 0.52,
+        interactive: false
+      }).addTo(nightSkyLayer);
+
+      // Línia del terminador (recta tangent a l'òrbita terrestre)
+      L.polyline(tangentLatLngs, {
+        color: "#818cf8",
+        weight: 2.5,
+        dashArray: "8, 6",
+        opacity: 0.95
+      })
+        .bindTooltip("Terminador dia / nit: recta tangent a l'òrbita terrestre (els astres de la zona fosca són visibles aquesta nit)", {
+          sticky: true
+        })
+        .addTo(nightSkyLayer);
+    }
+
+    function renderPlaquesLayer() {
+      plaquesLayer.clearLayers();
+      PHYSICAL_PLAQUES.forEach((pq) => {
+        const distM = map.distance(SUN_COORDS, pq.coords);
+        const icon = L.divIcon({
+          className: "plaque-marker",
+          html: "📍",
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        });
+
+        L.marker(pq.coords, { icon })
+          .bindTooltip(pq.name, { direction: "top" })
+          .bindPopup(
+            `<b>📍 ${pq.name}</b><br>
+             Coordenades: <code>${pq.coords[0].toFixed(5)}, ${pq.coords[1].toFixed(5)}</code><br>
+             Distància al Sol: <b>${formatDistance(distM)}</b><br>
+             <small>${pq.desc}</small>`
+          )
+          .addTo(plaquesLayer);
+      });
+    }
+
     function renderProbesAndObjects() {
       Object.values(OBJECT_LAYERS).forEach((lg) => lg.clearLayers());
+      nightSkyLayer.clearLayers();
 
       const listEl = document.getElementById("probe-list");
       const legendEl = document.getElementById("ecliptic-legend");
       const freeBoxEl = document.getElementById("free-angle-box");
+      const nightRowEl = document.getElementById("night-sky-row");
       listEl.innerHTML = "";
 
       const mode = document.getElementById("bearing-select").value;
@@ -1321,6 +1483,7 @@
       const isFree = mode === "free";
 
       legendEl.style.display = isEcliptic ? "block" : "none";
+      nightRowEl.style.display = isEcliptic ? "flex" : "none";
       freeBoxEl.classList.toggle("hidden", !isFree);
 
       const freeAzimuth = parseFloat(document.getElementById("free-angle-slider").value);
@@ -1332,11 +1495,10 @@
 
       const objects = getLiveObjectsState();
       let currentCategory = "";
+      let earthCoordsToday = null;
+      let earthBearingToday = null;
 
       objects.forEach((obj) => {
-        if (!LAYER_VISIBILITY[obj.layerKey]) return;
-
-        // Càlcul de l'azimut de projecció segons el mode seleccionat
         let bearing;
         if (isEcliptic) {
           bearing = (360 - obj.lonDeg) % 360;
@@ -1352,8 +1514,15 @@
           : obj.au * AU_MAP_M;
 
         const coords = destinationPoint(SUN_COORDS[0], SUN_COORDS[1], distMapMeters, bearing);
-        const isPlanet = obj.layerKey === "planets";
 
+        if (obj.id === "planet_terra") {
+          earthCoordsToday = coords;
+          earthBearingToday = bearing;
+        }
+
+        if (!LAYER_VISIBILITY[obj.layerKey]) return;
+
+        const isPlanet = obj.layerKey === "planets";
         const icon = L.divIcon({
           className: isPlanet ? "planet-marker" : "probe-marker",
           html: `<div style="width:100%;height:100%;background:${obj.color};border-radius:50%;"></div>`,
@@ -1411,6 +1580,41 @@
         });
         listEl.appendChild(item);
       });
+
+      if (plaquesVisible) {
+        const catHeader = document.createElement("div");
+        catHeader.className = "probe-category";
+        catHeader.textContent = "Plaques físiques instal·lades (SSJ)";
+        listEl.appendChild(catHeader);
+
+        PHYSICAL_PLAQUES.forEach((pq) => {
+          const distM = map.distance(SUN_COORDS, pq.coords);
+          const item = document.createElement("div");
+          item.className = "probe-item";
+          item.innerHTML = `
+            <div class="probe-name">
+              <span class="dot" style="background:${pq.color};border-radius:3px;"></span>
+              <div>
+                <div>${pq.name}</div>
+                <div class="probe-sub">${pq.coords[0].toFixed(5)}, ${pq.coords[1].toFixed(5)}</div>
+              </div>
+            </div>
+            <div class="probe-dist">
+              <div><strong>${formatDistance(distM)}</strong></div>
+              <div>Fita física</div>
+            </div>
+          `;
+          item.addEventListener("click", () => {
+            const targetZoom = distM < 80 ? 19 : distM < 400 ? 17 : 15;
+            map.flyTo(pq.coords, targetZoom, { duration: 1.0 });
+          });
+          listEl.appendChild(item);
+        });
+      }
+
+      if (isEcliptic && nightSkyVisible && earthCoordsToday) {
+        renderNightSkyOverlay(earthCoordsToday, earthBearingToday);
+      }
 
       if (listEl.innerHTML === "") {
         listEl.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem;">Cap capa d'objectes activa. Activa algun botó a la capçalera superior.</div>`;
@@ -1571,7 +1775,7 @@
     });
 
     // =========================================================================
-    // 8. CONTROLS D'INTERFÍCIE, CAPES, TEMA CLAR/FOSC I RENDERITZAT KATEX
+    // 8. CONTROLS D'INTERFÍCIE, CAPES, PLAQUES, CEL NOCTURN I KATEX
     // =========================================================================
     document.getElementById("btn-theme").addEventListener("click", () => {
       const body = document.body;
@@ -1601,7 +1805,24 @@
       orbitsVisible = !orbitsVisible;
     });
 
-    // Botons d'activació/desactivació de cada categoria d'astres
+    const btnPlanets = document.getElementById("btn-layer-planets");
+    const btnPlaques = document.getElementById("btn-layer-plaques");
+
+    btnPlaques.addEventListener("click", () => {
+      plaquesVisible = !plaquesVisible;
+      btnPlaques.classList.toggle("active", plaquesVisible);
+
+      if (plaquesVisible) {
+        map.addLayer(plaquesLayer);
+        LAYER_VISIBILITY.planets = false;
+        btnPlanets.classList.remove("active");
+        map.removeLayer(OBJECT_LAYERS.planets);
+      } else {
+        map.removeLayer(plaquesLayer);
+      }
+      renderProbesAndObjects();
+    });
+
     document.querySelectorAll(".layer-btn[data-layer]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const key = btn.getAttribute("data-layer");
@@ -1610,11 +1831,26 @@
 
         if (LAYER_VISIBILITY[key]) {
           map.addLayer(OBJECT_LAYERS[key]);
+          if (key === "planets" && plaquesVisible) {
+            plaquesVisible = false;
+            btnPlaques.classList.remove("active");
+            map.removeLayer(plaquesLayer);
+          }
         } else {
           map.removeLayer(OBJECT_LAYERS[key]);
         }
         renderProbesAndObjects();
       });
+    });
+
+    const btnNightSky = document.getElementById("btn-night-sky");
+    btnNightSky.addEventListener("click", () => {
+      nightSkyVisible = !nightSkyVisible;
+      btnNightSky.classList.toggle("active", nightSkyVisible);
+      btnNightSky.textContent = nightSkyVisible
+        ? "🌓 Amaga el cel nocturn de la Terra"
+        : "🌓 Mostra el cel nocturn de la Terra (avui)";
+      renderProbesAndObjects();
     });
 
     document.getElementById("bearing-select").addEventListener("change", renderProbesAndObjects);
@@ -1648,6 +1884,7 @@
       document.getElementById("today-date").textContent = `Data: ${todayStr}`;
 
       CHALLENGES = getChallenges();
+      renderPlaquesLayer();
       renderProbesAndObjects();
       loadChallenge();
 
